@@ -11,7 +11,7 @@ import SwiftUI
 struct Open_PingApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
         }
     }
 }
