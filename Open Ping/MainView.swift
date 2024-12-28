@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  MainView.swift
 //  Open Ping
 //
 //  Created by Merlos on 12/25/24.
@@ -13,13 +13,12 @@ struct MainView: View {
     @State private var showDetail = false
     @State private var selectedDomainOrIP: String?
 
-    
     init(pingHistory: [String] = []) {
         _pingHistory = State(initialValue: pingHistory)
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 // Input Field
                 TextField("Enter domain or IP", text: $input)
@@ -108,5 +107,4 @@ struct MainView: View {
 
 #Preview {
     MainView(pingHistory: ["google.com", "apple.com", "example.com"])
-
 }
