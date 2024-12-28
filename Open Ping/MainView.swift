@@ -56,6 +56,12 @@ struct MainView: View {
                 EditButton() // Add an Edit button for delete mode
             }
             .onAppear(perform: loadHistory)
+            // NavigationDestination for PingView
+            .navigationDestination(isPresented: $showDetail) {
+                if let domainOrIP = selectedDomainOrIP {
+                    PingView(domainOrIP: domainOrIP)
+                }
+            }
         }
     }
     
