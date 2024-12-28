@@ -5,8 +5,12 @@
 //  Created by Sami Yrjänheikki on 6.8.2018.
 //  Copyright © 2018 Sami Yrjänheikki. All rights reserved.
 //
-// https://raw.githubusercontent.com/samiyr/SwiftyPing/refs/heads/master/Sources/SwiftyPing/SwiftyPing.swift
+// This file is distributed under MIT License
+// Originally from:
+// https://github.com/samiyr/SwiftyPing
 //
+
+
 import Foundation
 import Darwin
 
