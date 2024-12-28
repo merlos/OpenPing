@@ -22,14 +22,18 @@ struct MainView: View {
             VStack {
                 // Input Field
                 TextField("Enter domain or IP", text: $input)
+                    .autocapitalization(.none) // Prevents automatic capitalization
+                    .disableAutocorrection(true) // Disables autocorrection
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding()
+                    .font(.system(size: 28)) //
+                    .frame(height: 88)
                 
                 Button(action: addDomainToHistory) {
                     Text("Ping")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(.teal)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
@@ -113,4 +117,5 @@ struct MainView: View {
 
 #Preview {
     MainView(pingHistory: ["google.com", "apple.com", "example.com"])
+        //.environment(\.colorScheme, .dark) // Preview in Dark Mode
 }
