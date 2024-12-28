@@ -40,26 +40,23 @@ struct MainView: View {
                 List {
                     ForEach(pingHistory, id: \.self) { domain in
                         Button(action: {
+                            moveDomainToBeginning(domain)
                             selectedDomainOrIP = domain
                             showDetail = true
                         }) {
                             Text(domain)
                         }
                     }
+                    .onDelete(perform: deleteFromHistory)
                 }
                 
                 Spacer()
             }
             .navigationTitle("Open Ping")
+            .toolbar {
+                EditButton() // Add an Edit button for delete mode
+            }
             .onAppear(perform: loadHistory)
-            .background(
-                NavigationLink(
-                    destination: PingView(domainOrIP: selectedDomainOrIP ?? ""),
-                    isActive: $showDetail,
-                    label: { EmptyView() }
-                )
-                .hidden()
-            )
         }
     }
     
@@ -69,16 +66,43 @@ struct MainView: View {
         }
     }
     
-    func addDomainToHistory() {
-        guard !input.isEmpty else { return }
-        
-        if !pingHistory.contains(input) {
-            pingHistory.append(input)
-            UserDefaults.standard.set(pingHistory, forKey: "PingHistory")
+    func moveDomainToBeginning(_ domain: String) {
+        // Remove the domain if it already exists
+        if let existingIndex = pingHistory.firstIndex(of: domain) {
+            pingHistory.remove(at: existingIndex)
         }
         
-        selectedDomainOrIP = input
+        // Insert the domain at the beginning
+        pingHistory.insert(domain, at: 0)
+        
+        // Save the updated history to UserDefaults
+        saveHistory()
+    }
+    
+    func addDomainToHistory() {
+        // Trim spaces and convert to lowercase
+        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmedInput.isEmpty else { return }
+
+        moveDomainToBeginning(trimmedInput)
+        
+        // Update the selected domain and show detail
+        selectedDomainOrIP = trimmedInput
+        
+        // Clear the TextField
+        input = ""
+        
+        // Start pinging
         showDetail = true
+    }
+    
+    func deleteFromHistory(at offsets: IndexSet) {
+        pingHistory.remove(atOffsets: offsets)
+        saveHistory()
+    }
+    
+    func saveHistory() {
+        UserDefaults.standard.set(pingHistory, forKey: "PingHistory")
     }
 }
 
