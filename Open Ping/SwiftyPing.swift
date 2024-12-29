@@ -81,6 +81,67 @@ public enum PingError: Error, Equatable {
     case invalidHeaderOffset
     /// Failed to change socket options, in particular SIGPIPE.
     case socketOptionsSetError(err: Int32)
+    
+    func errorDescription() -> String {
+            switch self {
+            case .responseTimeout:
+                return "The response took longer to arrive than the configured timeout interval."
+                
+            case .invalidLength(let received):
+                return "The response length was too short. Received: \(received) bytes."
+                
+            case .checksumMismatch(let received, let calculated):
+                return "The received checksum doesn't match the calculated one. Received: \(received), Calculated: \(calculated)"
+                
+            case .invalidType(let received):
+                return "Response type was invalid. Received: \(received)"
+                
+            case .invalidCode(let received):
+                return "Response code was invalid. Received: \(received)"
+                
+            case .identifierMismatch(let received, let expected):
+                return "Response identifier mismatch. Received: \(received), Expected: \(expected)"
+                
+            case .invalidSequenceIndex(let received, let expected):
+                return "Response sequence number mismatch. Received: \(received), Expected: \(expected)"
+                
+            case .unknownHostError:
+                return "Unknown error occurred within host lookup."
+                
+            case .addressLookupError:
+                return "Address lookup failed."
+                
+            case .hostNotFound:
+                return "Host was not found."
+                
+            case .addressMemoryError:
+                return "Address data could not be converted to sockaddr."
+                
+            case .requestError:
+                return "An error occurred while sending the ping request."
+                
+            case .requestTimeout:
+                return "The ping request timed out before it was sent."
+                
+            case .checksumOutOfBounds:
+                return "Checksum is out-of-bounds for UInt16."
+                
+            case .unexpectedPayloadLength:
+                return "Unexpected payload length encountered."
+                
+            case .packageCreationFailed:
+                return "Unspecified package creation error."
+                
+            case .socketNil:
+                return "The socket is unexpectedly nil."
+                
+            case .invalidHeaderOffset:
+                return "The ICMP header offset couldn't be calculated."
+                
+            case .socketOptionsSetError(let err):
+                return "Failed to change socket options (SIGPIPE). Error code: \(err)"
+            }
+        }
 }
 
 // MARK: SwiftyPing

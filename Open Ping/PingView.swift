@@ -12,7 +12,6 @@ struct PingView: View {
     let domainOrIP: String
     @State private var output: String = ""
     @State private var isPinging: Bool = true
-    //@State private var pinger: Pinger
     @State private var pinger: SwiftyPing?
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -51,15 +50,34 @@ struct PingView: View {
         }
         .navigationTitle(domainOrIP)
         .onAppear {
-            // setups pinger
-            self.pinger = try! SwiftyPing(host: domainOrIP, configuration: PingConfiguration(interval: 0.5, with: 5), queue: DispatchQueue.global())
-            print("PingView::OnAppear \(domainOrIP) \(isPinging)")
-            if isPinging {
-               startPing()
-            }
+            do {
+                self.output += ""
+                   // Attempt to initialize the pinger
+                   self.pinger = try SwiftyPing(
+                       host: domainOrIP,
+                       configuration: PingConfiguration(interval: 0.5, with: 5),
+                       queue: DispatchQueue.global()
+                   )
+                   print("PingView::OnAppear \(domainOrIP) \(isPinging)")
+                   //
+                self.output += "PING \(domainOrIP) sent...\n"
+                   // Start pinging if already active
+                   if isPinging {
+                       startPing()
+                   }
+               } catch let error as PingError {
+                  let errorMessage = error.errorDescription()
+                  print(errorMessage)
+                  self.output += "\(errorMessage)\n"
+               } catch {
+                   print("Unknown error: \(error)")
+                   self.output += "Unknown error: \(error)\n"
+               }
         }
         .onDisappear {
-            stopPing()
+            if isPinging {
+                stopPing()
+            }
         }
     }
     func togglePing() {
@@ -74,30 +92,61 @@ struct PingView: View {
         
         //64 bytes from mad41s13-in-f3.1e100.net (142.250.200.99): icmp_seq=3 ttl=118 time=3.94 ms
         let durationMs = String(format: "%.1f", response.duration * 1000)
-        let bytesWithHeader: Int = response.byteCount ?? 0 + 20
+        let bytesWithHeader: Int = response.byteCount ?? 0
         let bytes: String = String(bytesWithHeader)
         let ttl: String = String(response.ipHeader?.timeToLive ?? 0)
         let ipAddress: String = response.ipAddress?.description ?? "<ip>"
-        return "\(bytes) bytes from  \(ipAddress): icmp_sec: \(String(describing: response.sequenceNumber)) ttl: \(ttl)) time: \(durationMs) ms"
+        return "\(bytes) bytes from \(ipAddress): icmp_sec: \(String(describing: response.sequenceNumber)) ttl: \(ttl)) time: \(durationMs) ms"
     }
     
-    func resultToText(_ result: PingResult) -> String {
-        return "result"
+    func resultToText(_ pingResult: PingResult) -> String {
+        
+        let transmitted = pingResult.packetsTransmitted
+        let received = pingResult.packetsReceived
+        let packetLossPercentage = Double(transmitted - received) / Double(transmitted) * 100.0
+           
+        let packetLoss = String(format: "%.1f", packetLossPercentage)
+           
+        var result = """
+           --- \(domainOrIP) ping statistics ---
+           \(transmitted) packets transmitted, \(received) packets received, \(packetLoss)% packet loss
+           """
+           
+           if let roundtrip = pingResult.roundtrip {
+               let min = String(format: "%.3f", roundtrip.minimum * 1000) // Convert to milliseconds
+               let avg = String(format: "%.3f", roundtrip.average * 1000)
+               let max = String(format: "%.3f", roundtrip.maximum * 1000)
+               let stddev = String(format: "%.3f", roundtrip.standardDeviation * 1000)
+               
+               result += """
+               
+               round-trip min/avg/max/stddev = \(min)/\(avg)/\(max)/\(stddev) ms
+               """
+           }
+           
+           return result
     }
     
     func startPing() {
         isPinging = true
         pinger?.observer = { (response) in
-            let duration = response.duration
-                print(duration)
+            print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
+            if (response.error == PingError.responseTimeout) {
+                print(response.error)
+                self.output.append("Request timeout for icmp_seq: \(String(describing: response.sequenceNumber))\n")
+    
+            } else {
                 self.output.append("\(responseToText(response))\n")
             }
+        }
         try! pinger?.startPinging()
+        
     }
     func stopPing() {
         isPinging = false
         pinger?.finished = { (result) in
             print("PingView finished with \(result)")
+            self.output += resultToText(result)
         }
         pinger?.stopPinging()
     }
