@@ -11,7 +11,7 @@ This is a plain application that allows you to ping a domain or an IP (IPv4). Ma
 The app is not yet published on the App Store
 
 ## Hey, merlos, why did you create Open Ping?
-During a lot of time I used [Mocha Ping Lite](https://mochasoft.dk/iphone_ping.htm) which was fine and free though with a careless user interface. I only used the ping a single IP, and I usually pinged a few IPs or domains... but main problem was accessing the history. I wanted to just tap on the domain. So, one day I did some research on existing libraries, et voilá. 
+During a lot of time I used [Mocha Ping Lite](https://mochasoft.dk/iphone_ping.htm) which was fine and free. I only used the ping a single IP, and I usually pinged a few IPs or domains... but main problem was accessing the history. Most of the time I just wanted to ping some domain or IP that I already pinged in the past, I wanted to tap on the domain. So, one day I did some research on existing libraries, et voilá. 
 
 ## Acknoledgements
 
@@ -20,4 +20,5 @@ The code that performs the actual ping is based on https://github.com/samiyr/Swi
 ## LICENSE
 
 GPLv3
-(except for the SwiftyPing
+
+(except for the [SwiftyPing](/Open%20Ping/SwiftyPing.swift) which is MIT)
