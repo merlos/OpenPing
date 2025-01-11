@@ -50,30 +50,44 @@ struct PingView: View {
         }
         .navigationTitle(domainOrIP)
         .onAppear {
-            do {
-                self.output += ""
-                   // Attempt to initialize the pinger
-                   self.pinger = try SwiftyPing(
-                       host: domainOrIP,
-                       configuration: PingConfiguration(interval: 0.5, with: 5),
-                       queue: DispatchQueue.global()
-                   )
-                   print("PingView::OnAppear \(domainOrIP) \(isPinging)")
-                   //
-                self.output += "PING \(domainOrIP) sent...\n"
-                   // Start pinging if already active
-                   if isPinging {
-                       startPing()
-                   }
-               } catch let error as PingError {
-                  let errorMessage = error.errorDescription()
-                  print(errorMessage)
-                  self.output += "\(errorMessage)\n"
-               } catch {
-                   print("Unknown error: \(error)")
-                   self.output += "Unknown error: \(error)\n"
-               }
+            Task {
+                do {
+                    self.pinger = try await withCheckedThrowingContinuation { continuation in
+                        do {
+                            let pinger = try SwiftyPing(
+                                host: domainOrIP,
+                                configuration: PingConfiguration(interval: 0.5, with: 5),
+                                queue: DispatchQueue.global()
+                            )
+                            continuation.resume(returning: pinger)
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                    
+                    // Update the UI with the ping initialization message
+                    self.output += "PING \(domainOrIP) sent...\n"
+                    print("PingView::OnAppear \(domainOrIP) \(isPinging)")
+                    
+                    // Start pinging if already active
+                    if isPinging {
+                        startPing()
+                    }
+                } catch let error as PingError {
+                    // Handle PingError with a descriptive message
+                    let errorMessage = error.errorDescription()
+                    self.output += "\(errorMessage)\n"
+                    print("PingView::OnAppear: PingError:  \(errorMessage)")
+                } catch {
+                    // Handle any other errors
+                    let unknownErrorMessage = "Unknown error: \(error)"
+                    self.output += "\(unknownErrorMessage)\n"
+                    print("PingView::OnAppear: UnknownError:  \(unknownErrorMessage)")
+                }
+            }
         }
+
+
         .onDisappear {
             if isPinging {
                 stopPing()
