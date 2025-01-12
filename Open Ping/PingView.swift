@@ -117,7 +117,7 @@ struct PingView: View {
         
         let transmitted = pingResult.packetsTransmitted
         let received = pingResult.packetsReceived
-        let packetLossPercentage = Double(transmitted - received) / Double(transmitted) * 100.0
+        let packetLossPercentage = 100 * (Double(transmitted) - Double(received)) / Double(transmitted)
            
         let packetLoss = String(format: "%.1f", packetLossPercentage)
            
@@ -134,7 +134,7 @@ struct PingView: View {
                
                result += """
                
-               round-trip min/avg/max/stddev = \(min)/\(avg)/\(max)/\(stddev) ms
+               round-trip min/avg/max/stddev = \(min)/\(avg)/\(max)/\(stddev) ms\n\n
                """
            }
            
