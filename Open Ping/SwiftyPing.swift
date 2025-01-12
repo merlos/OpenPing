@@ -586,6 +586,7 @@ public class SwiftyPing: NSObject {
         if socket == nil {
             try createSocket()
         }
+        print("SequenceIndex: \(_sequenceIndex)")
         killswitch = false
         sendPing()
     }
@@ -596,12 +597,13 @@ public class SwiftyPing: NSObject {
         killswitch = true
         isPinging = false
         let count = trueSequenceIndex
+        informFinishedStatus(count)
         if resetSequence {
+            responses = []
             sequenceIndex = 0
             trueSequenceIndex = 0
             erroredIndices.removeAll()
         }
-        informFinishedStatus(count)
     }
     /// Stops pinging the host and destroys the CFSocket object.
     /// - Parameter resetSequence: Controls whether the sequence index should be set back to zero.
@@ -846,7 +848,7 @@ public struct PingResult {
         public let standardDeviation: Double
     }
     /// Collection of all responses, including errored or timed out.
-    public let responses: [PingResponse]
+    public var responses: [PingResponse]
     /// Number of packets sent.
     public let packetsTransmitted: UInt64
     /// Number of packets received.
