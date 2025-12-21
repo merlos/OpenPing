@@ -50,21 +50,25 @@ struct PingView: View {
         }
         .navigationTitle(domainOrIP)
         .onAppear {
+            self.output = "Resolving \(domainOrIP) IP address...\n"
             Task {
                 do {
                     self.pinger = try await withCheckedThrowingContinuation { continuation in
-                        do {
-                            let pinger = try SwiftyPing(
-                                host: domainOrIP,
-                                configuration: PingConfiguration(interval: 0.5, with: 5),
-                                queue: DispatchQueue.global()
-                            )
-                            continuation.resume(returning: pinger)
-                        } catch {
-                            continuation.resume(throwing: error)
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            do {
+                                let pinger = try SwiftyPing(
+                                    host: domainOrIP,
+                                    configuration: PingConfiguration(interval: 0.5, with: 5),
+                                    queue: DispatchQueue.global()
+                                )
+                                continuation.resume(returning: pinger)
+                            } catch {
+                                continuation.resume(throwing: error)
+                            }
                         }
                     }
                     
+                    self.output = ""
                     // Update the UI with the ping initialization message
                     if let ip = self.pinger?.destination.ip, ip != domainOrIP {
                         self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
