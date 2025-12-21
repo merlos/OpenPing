@@ -12,6 +12,17 @@ struct MainView: View {
     @State private var pingHistory: [String] = []
     @State private var showDetail = false
     @State private var selectedDomainOrIP: String?
+    
+    // Computed filtered list based on input (case-insensitive contains)
+    private var filteredHistory: [String] {
+        let query = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return pingHistory }
+        let matches = pingHistory.filter { $0.range(of: query, options: .caseInsensitive) != nil }
+        return matches.isEmpty ? pingHistory : matches
+    }
+
+    // Track the ID of the first item to enable scrolling to top
+    @State private var topItemID: String? = nil
 
     init(pingHistory: [String] = []) {
         _pingHistory = State(initialValue: pingHistory)
@@ -39,18 +50,28 @@ struct MainView: View {
                 }
                 .padding(.horizontal)
                 
-                // History List
-                List {
-                    ForEach(pingHistory, id: \.self) { domain in
-                        Button(action: {
-                            moveDomainToBeginning(domain)
-                            selectedDomainOrIP = domain
-                            showDetail = true
-                        }) {
-                            Text(domain)
+                ScrollViewReader { proxy in
+                    List {
+                        ForEach(filteredHistory, id: \.self) { domain in
+                            Button(action: {
+                                moveDomainToBeginning(domain)
+                                selectedDomainOrIP = domain
+                                showDetail = true
+                            }) {
+                                Text(domain)
+                            }
+                            .id(domain) // stable ID for scrolling
+                        }
+                        .onDelete(perform: deleteFromHistory)
+                    }
+                    .onChange(of: input) { _, _ in
+                        // When typing, attempt to scroll to the first filtered item
+                        if let first = filteredHistory.first {
+                            withAnimation {
+                                proxy.scrollTo(first, anchor: .top)
+                            }
                         }
                     }
-                    .onDelete(perform: deleteFromHistory)
                 }
                 
                 Spacer()
@@ -60,6 +81,9 @@ struct MainView: View {
                 EditButton() // Add an Edit button for delete mode
             }
             .onAppear(perform: loadHistory)
+            .onAppear {
+                topItemID = pingHistory.first
+            }
             // NavigationDestination for PingView
             .navigationDestination(isPresented: $showDetail) {
                 if let domainOrIP = selectedDomainOrIP {
