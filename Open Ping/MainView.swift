@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var input: String = ""
     @StateObject private var historyManager: HistoryManager
     @State private var showDetail = false
+    @State private var showSettings = false
     @State private var selectedDomainOrIP: String?
     
     init(historyManager: HistoryManager = HistoryManager()) {
@@ -56,7 +57,17 @@ struct MainView: View {
             }
             .navigationTitle("Open Ping")
             .toolbar {
-                EditButton() // Add an Edit button for delete mode
+                ToolbarItem(placement: .navigationBarLeading) {
+                    EditButton()
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             // NavigationDestination for PingView
             .navigationDestination(isPresented: $showDetail) {

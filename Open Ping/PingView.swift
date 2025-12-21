@@ -14,6 +14,8 @@ struct PingView: View {
     @State private var output: String = ""
     @State private var isPinging: Bool = true
     @State private var pinger: SwiftyPing?
+    @State private var showSettings = false
+    @ObservedObject private var settings = SettingsManager.shared
 
     init(domainOrIP: String, isPinging: Bool=true) {
         self.domainOrIP = domainOrIP
@@ -66,6 +68,16 @@ struct PingView: View {
             }
         }
         .navigationTitle(domainOrIP)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showSettings = true }) {
+                    Image(systemName: "gearshape")
+                }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
         .onAppear {
             self.output = "Resolving \(domainOrIP) IP address...\n"
             Task {
@@ -73,9 +85,16 @@ struct PingView: View {
                     self.pinger = try await withCheckedThrowingContinuation { continuation in
                         DispatchQueue.global(qos: .userInitiated).async {
                             do {
+                                var config = PingConfiguration(
+                                    interval: settings.intervalSeconds,
+                                    with: settings.timeoutSeconds
+                                )
+                                config.timeToLive = settings.ttl
+                                config.payloadSize = settings.packetSize
+                                
                                 let pinger = try SwiftyPing(
                                     host: domainOrIP,
-                                    configuration: PingConfiguration(interval: 0.5, with: 5),
+                                    configuration: config,
                                     queue: DispatchQueue.global()
                                 )
                                 continuation.resume(returning: pinger)
