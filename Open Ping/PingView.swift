@@ -66,7 +66,11 @@ struct PingView: View {
                     }
                     
                     // Update the UI with the ping initialization message
-                    self.output += "PING \(domainOrIP) sent...\n"
+                    if let ip = self.pinger?.destination.ip, ip != domainOrIP {
+                        self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
+                    } else {
+                        self.output += "PING \(domainOrIP) sent...\n"
+                    }
                     print("PingView::OnAppear \(domainOrIP) \(isPinging)")
                     
                     // Start pinging if already active
