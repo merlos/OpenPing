@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  Open Ping
 //
-//  Created by Merlos on 12/25/24.
+//  Created by Merlos on 12/21/25.
 //
 
 import SwiftUI
