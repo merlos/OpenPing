@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct PingView: View {
-    @Environment(\.dismiss) private var dismiss
     let domainOrIP: String
     @State private var output: String = ""
     @State private var isPinging: Bool = true
@@ -23,49 +22,33 @@ struct PingView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            VStack {
-                // Output Text
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        Text(output)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .font(.system(.caption2, design: .monospaced)) // Monospace font
-                            .id("outputText")
-                    }
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding()
-                    .onChange(of: output) { oldValue, newValue in
-                        proxy.scrollTo("outputText", anchor: .bottom)
-                    }
+        VStack {
+            // Output Text
+            ScrollViewReader { proxy in
+                ScrollView {
+                    Text(output)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .font(.system(.caption2, design: .monospaced)) // Monospace font
+                        .id("outputText")
                 }
-                // Start/Stop Button
-                HStack(spacing: 12) {
-                    if !isPinging {
-                        Button(action: { dismiss() }) {
-                            Text("⭠ Back")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.gray)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                        .frame(width: (geometry.size.width - 32 - 12) / 3)
-                    }
-                    
-                    Button(action: togglePing) {
-                        Text(isPinging ? "Stop" : "Start")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isPinging ? Color.red : Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(10)
+                .padding()
+                .onChange(of: output) { oldValue, newValue in
+                    proxy.scrollTo("outputText", anchor: .bottom)
                 }
-                .padding(.horizontal)
             }
+            // Start/Stop Button
+            Button(action: togglePing) {
+                Text(isPinging ? "Stop" : "Start")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isPinging ? Color.red : Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal)
         }
         .navigationTitle(domainOrIP)
         .toolbar {
