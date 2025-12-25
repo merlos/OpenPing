@@ -18,6 +18,9 @@ struct SettingsView: View {
                     // TTL
                     VStack(alignment: .leading) {
                         Text("TTL (Time to Live)")
+                        Text("Max number of hops (routers) before packet is discarded.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         HStack {
                             Slider(value: Binding(
                                 get: { Double(settings.ttl) },
@@ -38,6 +41,9 @@ struct SettingsView: View {
                     // Timeout
                     VStack(alignment: .leading) {
                         Text("Timeout (ms)")
+                        Text("Time to wait for a response (pong).")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         HStack {
                             Slider(value: $settings.timeoutMs, in: settings.minTimeout...settings.maxTimeout, step: 100)
                             
@@ -55,6 +61,9 @@ struct SettingsView: View {
                     // Interval
                     VStack(alignment: .leading) {
                         Text("Send Interval (ms)")
+                        Text("Time between sending ping packets.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         HStack {
                             Slider(value: $settings.intervalMs, in: settings.minInterval...settings.maxInterval, step: 100)
                             
@@ -72,6 +81,9 @@ struct SettingsView: View {
                     // Packet Size
                     VStack(alignment: .leading) {
                         Text("Packet Size (bytes)")
+                        Text("Size of the data payload.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         HStack {
                             Slider(value: Binding(
                                 get: { Double(settings.packetSize) },
