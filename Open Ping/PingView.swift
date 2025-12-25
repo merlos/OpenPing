@@ -78,56 +78,16 @@ struct PingView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .onAppear {
-            self.output = "Resolving \(domainOrIP) IP address...\n"
-            Task {
-                do {
-                    self.pinger = try await withCheckedThrowingContinuation { continuation in
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            do {
-                                var config = PingConfiguration(
-                                    interval: settings.intervalSeconds,
-                                    with: settings.timeoutSeconds
-                                )
-                                config.timeToLive = settings.ttl
-                                config.payloadSize = settings.packetSize
-                                
-                                let pinger = try SwiftyPing(
-                                    host: domainOrIP,
-                                    configuration: config,
-                                    queue: DispatchQueue.global()
-                                )
-                                continuation.resume(returning: pinger)
-                            } catch {
-                                continuation.resume(throwing: error)
-                            }
-                        }
-                    }
-                    
-                    self.output = ""
-                    // Update the UI with the ping initialization message
-                    if let ip = self.pinger?.destination.ip, ip != domainOrIP {
-                        self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
-                    } else {
-                        self.output += "PING \(domainOrIP) sent...\n"
-                    }
-                    print("PingView::OnAppear \(domainOrIP) \(isPinging)")
-                    
-                    // Start pinging if already active
-                    if isPinging {
-                        startPing()
-                    }
-                } catch let error as PingError {
-                    // Handle PingError with a descriptive message
-                    let errorMessage = error.errorDescription()
-                    self.output += "\(errorMessage)\n"
-                    print("PingView::OnAppear: PingError:  \(errorMessage)")
-                } catch {
-                    // Handle any other errors
-                    let unknownErrorMessage = "Unknown error: \(error)"
-                    self.output += "\(unknownErrorMessage)\n"
-                    print("PingView::OnAppear: UnknownError:  \(unknownErrorMessage)")
+        .onChange(of: showSettings) { _, isPresented in
+            if !isPresented {
+                Task {
+                    await setupPinger(resetOutput: false)
                 }
+            }
+        }
+        .onAppear {
+            Task {
+                await setupPinger(resetOutput: true)
             }
         }
 
@@ -138,6 +98,72 @@ struct PingView: View {
             }
         }
     }
+    
+    func setupPinger(resetOutput: Bool) async {
+        if resetOutput {
+            self.output = "Resolving \(domainOrIP) IP address...\n"
+        } else {
+            // Stop existing pinger if any
+            if let existingPinger = pinger {
+                existingPinger.haltPinging()
+            }
+        }
+        
+        do {
+            let newPinger = try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        var config = PingConfiguration(
+                            interval: settings.intervalSeconds,
+                            with: settings.timeoutSeconds
+                        )
+                        config.timeToLive = settings.ttl
+                        config.payloadSize = settings.packetSize
+                        
+                        let pinger = try SwiftyPing(
+                            host: domainOrIP,
+                            configuration: config,
+                            queue: DispatchQueue.global()
+                        )
+                        continuation.resume(returning: pinger)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            
+            self.pinger = newPinger
+            
+            if resetOutput {
+                self.output = ""
+                // Update the UI with the ping initialization message
+                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
+                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
+                } else {
+                    self.output += "PING \(domainOrIP) sent...\n"
+                }
+            } else {
+                self.output += "\n--- Configuration updated (TTL: \(settings.ttl), Size: \(settings.packetSize), Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms, Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms) ---\n"
+            }
+            print("PingView::setupPinger \(domainOrIP) \(isPinging)")
+            
+            // Start pinging if already active
+            if isPinging {
+                startPing()
+            }
+        } catch let error as PingError {
+            // Handle PingError with a descriptive message
+            let errorMessage = error.errorDescription()
+            self.output += "\(errorMessage)\n"
+            print("PingView::setupPinger: PingError:  \(errorMessage)")
+        } catch {
+            // Handle any other errors
+            let unknownErrorMessage = "Unknown error: \(error)"
+            self.output += "\(unknownErrorMessage)\n"
+            print("PingView::setupPinger: UnknownError:  \(unknownErrorMessage)")
+        }
+    }
+    
     func togglePing() {
         if isPinging {
             stopPing()
@@ -189,10 +215,13 @@ struct PingView: View {
         isPinging = true
         pinger?.observer = { (response) in
             print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
-            if (response.error == PingError.responseTimeout) {
-                print(response.error)
-                self.output.append("Request timeout for icmp_seq: \(String(describing: response.sequenceNumber))\n")
-    
+            if let error = response.error {
+                if error == PingError.responseTimeout {
+                    print(error)
+                    self.output.append("Request timeout for icmp_seq: \(String(describing: response.sequenceNumber))\n")
+                } else {
+                    self.output.append("Error: \(error.errorDescription())\n")
+                }
             } else {
                 self.output.append("\(responseToText(response))\n")
             }

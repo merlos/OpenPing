@@ -367,7 +367,8 @@ public class SwiftyPing: NSObject {
             }
             
             // Set TTL
-            if var ttl = configuration.timeToLive {
+            if let ttlVal = configuration.timeToLive {
+                var ttl = CInt(ttlVal)
                 let err = setsockopt(handle, IPPROTO_IP, IP_TTL, &ttl, socklen_t(MemoryLayout.size(ofValue: ttl)))
                 guard err == 0 else {
                     throw PingError.socketOptionsSetError(err: err)
@@ -692,13 +693,14 @@ public class SwiftyPing: NSObject {
         var sum = UInt64(typecode) + UInt64(header.identifier) + UInt64(header.sequenceNumber)
         let payload = convert(payload: header.payload) + additionalPayload
         
-        guard payload.count % 2 == 0 else { throw PingError.unexpectedPayloadLength }
-        
         var i = 0
         while i < payload.count {
-            guard payload.indices.contains(i + 1) else { throw PingError.unexpectedPayloadLength }
-            // Convert two 8 byte ints to one 16 byte int
-            sum += Data([payload[i], payload[i + 1]]).withUnsafeBytes { UInt64($0.load(as: UInt16.self)) }
+            if i + 1 < payload.count {
+                sum += Data([payload[i], payload[i + 1]]).withUnsafeBytes { UInt64($0.load(as: UInt16.self)) }
+            } else {
+                // Handle odd byte by padding with zero
+                sum += Data([payload[i], 0]).withUnsafeBytes { UInt64($0.load(as: UInt16.self)) }
+            }
             i += 2
         }
         while sum >> 16 != 0 {
