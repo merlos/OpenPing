@@ -15,6 +15,7 @@ struct PingView: View {
     @State private var pinger: SwiftyPing?
     @State private var showSettings = false
     @State private var hasError = false
+    @State private var pingResults: [PingResponse] = []
     @ObservedObject private var settings = SettingsManager.shared
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -23,44 +24,63 @@ struct PingView: View {
     }
     
     var body: some View {
-        VStack {
-            // Output Text
-            ScrollViewReader { proxy in
-                ScrollView {
-                    Text(output)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .font(.system(.caption2, design: .monospaced)) // Monospace font
-                        .id("outputText")
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Header
+                Text(domainOrIP)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top)
+                
+                // Matrix Graph (1/3 height)
+                PingMatrixView(
+                    results: pingResults,
+                    timeout: settings.timeoutSeconds
+                )
+                .background(Color(UIColor.systemBackground))
+                .border(Color(UIColor.separator), width: 0.5)
+                
+                // Output Text (2/3 height)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        Text(output)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .font(.system(.caption2, design: .monospaced)) // Monospace font
+                            .id("outputText")
+                    }
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    .padding()
+                    .onChange(of: output) { oldValue, newValue in
+                        proxy.scrollTo("outputText", anchor: .bottom)
+                    }
                 }
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
-                .padding()
-                .onChange(of: output) { oldValue, newValue in
-                    proxy.scrollTo("outputText", anchor: .bottom)
+                
+                // Start/Stop/Retry Button
+                Button(action: togglePing) {
+                    if hasError {
+                        Text("Retry")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    } else {
+                        Text(isPinging ? "Stop" : "Start")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isPinging ? Color.red : Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
             }
-            // Start/Stop/Retry Button
-            Button(action: togglePing) {
-                if hasError {
-                    Text("Retry")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                } else {
-                    Text(isPinging ? "Stop" : "Start")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isPinging ? Color.red : Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-            }
-            .padding(.horizontal)
         }
-        .navigationTitle(domainOrIP)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showSettings = true }) {
@@ -96,9 +116,11 @@ struct PingView: View {
         hasError = false
         if resetOutput {
             self.output = "Resolving \(domainOrIP) IP address...\n"
+            self.pingResults = []
         } else {
             if isRetry {
                 self.output += "\nResolving \(domainOrIP) IP address...\n"
+                self.pingResults = []
             }
             // Stop existing pinger if any
             if let existingPinger = pinger {
@@ -226,6 +248,11 @@ struct PingView: View {
     func startPing() {
         isPinging = true
         pinger?.observer = { (response) in
+            // Update results on main thread
+            DispatchQueue.main.async {
+                self.pingResults.append(response)
+            }
+            
             print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
             if let error = response.error {
                 if error == PingError.responseTimeout {
