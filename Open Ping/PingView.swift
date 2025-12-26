@@ -14,6 +14,7 @@ struct PingView: View {
     @State private var isPinging: Bool = true
     @State private var pinger: SwiftyPing?
     @State private var showSettings = false
+    @State private var hasError = false
     @ObservedObject private var settings = SettingsManager.shared
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -39,14 +40,23 @@ struct PingView: View {
                     proxy.scrollTo("outputText", anchor: .bottom)
                 }
             }
-            // Start/Stop Button
+            // Start/Stop/Retry Button
             Button(action: togglePing) {
-                Text(isPinging ? "Stop" : "Start")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(isPinging ? Color.red : Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+                if hasError {
+                    Text("Retry")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                } else {
+                    Text(isPinging ? "Stop" : "Start")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isPinging ? Color.red : Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
             }
             .padding(.horizontal)
         }
@@ -82,10 +92,14 @@ struct PingView: View {
         }
     }
     
-    func setupPinger(resetOutput: Bool) async {
+    func setupPinger(resetOutput: Bool, isRetry: Bool = false) async {
+        hasError = false
         if resetOutput {
             self.output = "Resolving \(domainOrIP) IP address...\n"
         } else {
+            if isRetry {
+                self.output += "\nResolving \(domainOrIP) IP address...\n"
+            }
             // Stop existing pinger if any
             if let existingPinger = pinger {
                 existingPinger.haltPinging()
@@ -125,8 +139,14 @@ struct PingView: View {
                 } else {
                     self.output += "PING \(domainOrIP) sent...\n"
                 }
+            } else if isRetry {
+                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
+                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
+                } else {
+                    self.output += "PING \(domainOrIP) sent...\n"
+                }
             } else {
-                self.output += "\n--- Configuration updated (TTL: \(settings.ttl), Size: \(settings.packetSize), Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms, Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms) ---\n"
+                self.output += "\n--- Configuration updated (TTL: \(settings.ttl), Size: \(settings.packetSize), Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms) ---\n"
             }
             print("PingView::setupPinger \(domainOrIP) \(isPinging)")
             
@@ -139,16 +159,25 @@ struct PingView: View {
             let errorMessage = error.errorDescription()
             self.output += "\(errorMessage)\n"
             print("PingView::setupPinger: PingError:  \(errorMessage)")
+            hasError = true
+            isPinging = false
         } catch {
             // Handle any other errors
             let unknownErrorMessage = "Unknown error: \(error)"
             self.output += "\(unknownErrorMessage)\n"
             print("PingView::setupPinger: UnknownError:  \(unknownErrorMessage)")
+            hasError = true
+            isPinging = false
         }
     }
     
     func togglePing() {
-        if isPinging {
+        if hasError {
+            isPinging = true
+            Task {
+                await setupPinger(resetOutput: false, isRetry: true)
+            }
+        } else if isPinging {
             stopPing()
         } else {
             startPing()
