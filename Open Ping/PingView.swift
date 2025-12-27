@@ -17,6 +17,7 @@ struct PingView: View {
     @State private var pingResults: [PingResponse] = []
     @StateObject private var outputViewModel = PingOutputViewModel()
     @ObservedObject private var settings = SettingsManager.shared
+    @State private var isMatrixExpanded = false
 
     init(domainOrIP: String, isPinging: Bool=true) {
         self.domainOrIP = domainOrIP
@@ -28,20 +29,41 @@ struct PingView: View {
             AnimatedGradientBackground()
             
             GeometryReader { geometry in
+                let buttonHeight: CGFloat = 66
+                let matrixTopPadding: CGFloat = 8
+                let outputTopPadding: CGFloat = 8
+                let totalPadding = matrixTopPadding + outputTopPadding + buttonHeight
+                let availableHeight = geometry.size.height - totalPadding
+                
+                let matrixCollapsedHeight: CGFloat = 120
+                let outputExpandedHeight = availableHeight - matrixCollapsedHeight
+                // we reverse heights when expanded
+                let matrixExpandedHeight = outputExpandedHeight
+                let outputCollapsedHeight: CGFloat = matrixCollapsedHeight
+                
+                
                 VStack(spacing: 0) {
                     PingMatrixView(
                         results: pingResults,
-                        timeout: settings.timeoutSeconds
+                        timeout: settings.timeoutSeconds,
+                        availableHeight: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight
                     )
+                    .frame(height: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight)
                     .background(Color(UIColor.systemBackground).opacity(0.3))
                     .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 8)
-                    .padding(.top, 8)
+                    .padding(.top, matrixTopPadding)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                            isMatrixExpanded.toggle()
+                        }
+                    }
                     
                     PingOutputView(viewModel: outputViewModel)
+                        .frame(height: isMatrixExpanded ? outputCollapsedHeight : outputExpandedHeight)
                         .padding(.horizontal, 8)
-                        .padding(.top, 8)
+                        .padding(.top, outputTopPadding)
                     
                     // Start/Stop/Retry Button
                     Button(action: togglePing) {

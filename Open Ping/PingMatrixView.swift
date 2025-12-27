@@ -11,17 +11,23 @@ import UIKit
 struct PingMatrixView: View {
     var results: [PingResponse]
     var timeout: TimeInterval
+    var availableHeight: CGFloat
     
     // Square size
     let size: CGFloat = 16
     let spacing: CGFloat = 4
     let padding: CGFloat = 8
-    //Number of lines
-    let lines: CGFloat = 4
+    
+    // Calculate lines dynamically based on available height
+    private var lines: Int {
+        let heightForCells = availableHeight - (padding * 2)
+        let lineHeight = size + spacing
+        return max(4, Int(heightForCells / lineHeight))
+    }
 
     // (16 * 4) + (4 * 3) + 16 (padding) = 92
     private var contentHeight: CGFloat {
-        (size * lines) + (spacing * (lines - 1)) + (padding * 2)
+        (size * CGFloat(lines)) + (spacing * CGFloat(lines - 1)) + (padding * 2)
     }
     
     // Adaptive columns
@@ -33,7 +39,7 @@ struct PingMatrixView: View {
         GeometryReader { geometry in
             let availableWidth = geometry.size.width - (padding * 2)
             let columnsCount = Int((availableWidth + spacing) / (size + spacing))
-            let capacity = columnsCount * Int(lines)
+            let capacity = columnsCount * lines
             let placeholdersCount = max(0, capacity - results.count)
             
             ScrollViewReader { proxy in
@@ -63,7 +69,6 @@ struct PingMatrixView: View {
                 .background(Color(UIColor.systemBackground))
             }
         }
-        .frame(height: contentHeight)
     }
     
     func cell(for response: PingResponse) -> some View {
@@ -111,5 +116,5 @@ struct HeightPreferenceKey: PreferenceKey {
 }
 
 #Preview {
-    PingMatrixView(results: [], timeout: 1.0)
+    PingMatrixView(results: [], timeout: 1.0, availableHeight: 92)
 }
