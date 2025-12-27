@@ -104,7 +104,6 @@ struct PingOutputView: View {
             }
             .background(Color(UIColor.systemGray6))
             .cornerRadius(10)
-            .padding()
             .onChange(of: viewModel.output) { oldValue, newValue in
                 proxy.scrollTo("outputText", anchor: .bottom)
             }

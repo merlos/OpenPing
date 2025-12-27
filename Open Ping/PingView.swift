@@ -24,37 +24,64 @@ struct PingView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                PingMatrixView(
-                    results: pingResults,
-                    timeout: settings.timeoutSeconds
-                )
-                .background(Color(UIColor.systemBackground))
-                .border(Color(UIColor.separator), width: 0.5)
-                
-                PingOutputView(viewModel: outputViewModel)
-                
-                // Start/Stop/Retry Button
-                Button(action: togglePing) {
-                    if hasError {
-                        Text("Retry")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    } else {
-                        Text(isPinging ? "Stop" : "Start")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isPinging ? Color.red : Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
+        ZStack {
+            AnimatedGradientBackground()
+            
+            GeometryReader { geometry in
+                VStack(spacing: 0) {
+                    PingMatrixView(
+                        results: pingResults,
+                        timeout: settings.timeoutSeconds
+                    )
+                    .background(Color(UIColor.systemBackground).opacity(0.3))
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    
+                    PingOutputView(viewModel: outputViewModel)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                    
+                    // Start/Stop/Retry Button
+                    Button(action: togglePing) {
+                        ZStack {
+                            // Background layer
+                            Group {
+                                if hasError {
+                                    Color.gray
+                                } else if isPinging {
+                                    Color.red
+                                } else {
+                                    LinearGradient(
+                                        colors: [.green, .teal],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                }
+                            }
+                            .frame(height: 50)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            
+                            // Text layer on top
+                            Text(hasError ? "Retry" : (isPinging ? "Stop" : "Start"))
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.1))
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                        )
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
             }
         }
         .navigationTitle(domainOrIP)
