@@ -30,32 +30,40 @@ struct PingMatrixView: View {
     }
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: spacing) {
-                    // Render actual results
-                    ForEach(results.indices, id: \.self) { index in
-                        cell(for: results[index])
-                            .id(index)
+        GeometryReader { geometry in
+            let availableWidth = geometry.size.width - (padding * 2)
+            let columnsCount = Int((availableWidth + spacing) / (size + spacing))
+            let capacity = columnsCount * Int(lines)
+            let placeholdersCount = max(0, capacity - results.count)
+            
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: spacing) {
+                        // Render actual results
+                        ForEach(results.indices, id: \.self) { index in
+                            cell(for: results[index])
+                                .id("result-\(index)")
+                        }
+                        
+                        // Render placeholders (non-filled squares)
+                        ForEach(0..<placeholdersCount, id: \.self) { index in
+                            placeholderCell()
+                                .id("placeholder-\(index)")
+                        }
                     }
-                    //var rest = 20 - results.count
-                    // Render placeholders (non-filled squares)
-                    //ForEach(0..<rest) { _ in
-                     //   placeholderCell()
-                    //}
-                }
-                .padding(8)
-                .onChange(of: results.count) { _, count in
-                    if count > 0 {
-                        withAnimation {
-                            proxy.scrollTo(count - 1, anchor: .bottom)
+                    .padding(padding)
+                    .onChange(of: results.count) { _, count in
+                        if count > 0 {
+                            withAnimation {
+                                proxy.scrollTo("result-\(count - 1)", anchor: .bottom)
+                            }
                         }
                     }
                 }
+                .background(Color(UIColor.systemBackground))
             }
-            .background(Color(UIColor.systemBackground))
-            .frame(height: contentHeight)
         }
+        .frame(height: contentHeight)
     }
     
     func cell(for response: PingResponse) -> some View {
@@ -75,13 +83,17 @@ struct PingMatrixView: View {
     func color(for response: PingResponse) -> Color {
         if response.error != nil { return .red }
         
+        // Ensure timeout is positive to avoid division by zero
+        let safeTimeout = max(timeout, 0.001)
+        
         // Calculate ratio of duration to timeout (0.0 to 1.0)
-        let ratio = min(max(response.duration / timeout, 0), 1.0)
+        let ratio = min(max(response.duration / safeTimeout, 0), 1.0)
         
         // Interpolate Hue from 0.33 (Green) to 0.0 (Red)
         // 0.33 * (1 - ratio)
         // Green (low latency) -> Yellow -> Orange -> Red (high latency)
-        return Color(hue: 0.33 * (1 - ratio), saturation: 1.0, brightness: 0.9)
+        let hue = 0.33 * (1 - ratio)
+        return Color(hue: hue, saturation: 1.0, brightness: 0.9)
     }
     
     func placeholderCell() -> some View {
