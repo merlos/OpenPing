@@ -10,12 +10,14 @@ import SwiftUI
 
 struct PingView: View {
     let domainOrIP: String
-    @State private var output: String = ""
     @State private var isPinging: Bool = true
     @State private var pinger: SwiftyPing?
     @State private var showSettings = false
     @State private var hasError = false
+    @State private var pingResults: [PingResponse] = []
+    @StateObject private var outputViewModel = PingOutputViewModel()
     @ObservedObject private var settings = SettingsManager.shared
+    @State private var isMatrixExpanded = false
 
     init(domainOrIP: String, isPinging: Bool=true) {
         self.domainOrIP = domainOrIP
@@ -23,42 +25,86 @@ struct PingView: View {
     }
     
     var body: some View {
-        VStack {
-            // Output Text
-            ScrollViewReader { proxy in
-                ScrollView {
-                    Text(output)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .font(.system(.caption2, design: .monospaced)) // Monospace font
-                        .id("outputText")
-                }
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
-                .padding()
-                .onChange(of: output) { oldValue, newValue in
-                    proxy.scrollTo("outputText", anchor: .bottom)
+        ZStack {
+            AnimatedGradientBackground()
+            
+            GeometryReader { geometry in
+                let buttonHeight: CGFloat = 66
+                let matrixTopPadding: CGFloat = 8
+                let outputTopPadding: CGFloat = 8
+                let totalPadding = matrixTopPadding + outputTopPadding + buttonHeight
+                let availableHeight = geometry.size.height - totalPadding
+                
+                let matrixCollapsedHeight: CGFloat = 120
+                let outputExpandedHeight = availableHeight - matrixCollapsedHeight
+                // we reverse heights when expanded
+                let matrixExpandedHeight = outputExpandedHeight
+                let outputCollapsedHeight: CGFloat = matrixCollapsedHeight
+                
+                
+                VStack(spacing: 0) {
+                    PingMatrixView(
+                        results: pingResults,
+                        timeout: settings.timeoutSeconds,
+                        availableHeight: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight
+                    )
+                    .frame(height: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight)
+                    .background(Color(UIColor.systemBackground).opacity(0.3))
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 8)
+                    .padding(.top, matrixTopPadding)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                            isMatrixExpanded.toggle()
+                        }
+                    }
+                    
+                    PingOutputView(viewModel: outputViewModel)
+                        .frame(height: isMatrixExpanded ? outputCollapsedHeight : outputExpandedHeight)
+                        .padding(.horizontal, 8)
+                        .padding(.top, outputTopPadding)
+                    
+                    // Start/Stop/Retry Button
+                    Button(action: togglePing) {
+                        ZStack {
+                            // Background layer
+                            Group {
+                                if hasError {
+                                    Color.gray
+                                } else if isPinging {
+                                    Color.red
+                                } else {
+                                    LinearGradient(
+                                        colors: [.green, .teal],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                }
+                            }
+                            .frame(height: 50)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            
+                            // Text layer on top
+                            Text(hasError ? "Retry" : (isPinging ? "Stop" : "Start"))
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.1))
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                 }
             }
-            // Start/Stop/Retry Button
-            Button(action: togglePing) {
-                if hasError {
-                    Text("Retry")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                } else {
-                    Text(isPinging ? "Stop" : "Start")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isPinging ? Color.red : Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-            }
-            .padding(.horizontal)
         }
         .navigationTitle(domainOrIP)
         .toolbar {
@@ -95,10 +141,13 @@ struct PingView: View {
     func setupPinger(resetOutput: Bool, isRetry: Bool = false) async {
         hasError = false
         if resetOutput {
-            self.output = "Resolving \(domainOrIP) IP address...\n"
+            outputViewModel.clear()
+            outputViewModel.handleEvent(.resolving(domain: domainOrIP))
+            self.pingResults = []
         } else {
             if isRetry {
-                self.output += "\nResolving \(domainOrIP) IP address...\n"
+                outputViewModel.handleEvent(.resolving(domain: domainOrIP))
+                self.pingResults = []
             }
             // Stop existing pinger if any
             if let existingPinger = pinger {
@@ -131,22 +180,10 @@ struct PingView: View {
             
             self.pinger = newPinger
             
-            if resetOutput {
-                self.output = ""
-                // Update the UI with the ping initialization message
-                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
-                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
-                } else {
-                    self.output += "PING \(domainOrIP) sent...\n"
-                }
-            } else if isRetry {
-                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
-                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
-                } else {
-                    self.output += "PING \(domainOrIP) sent...\n"
-                }
+            if resetOutput || isRetry {
+                outputViewModel.handleEvent(.started(domain: domainOrIP, ip: self.pinger?.destination.ip))
             } else {
-                self.output += "\n--- Configuration updated (TTL: \(settings.ttl), Size: \(settings.packetSize), Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms) ---\n"
+                outputViewModel.handleEvent(.configUpdate(ttl: settings.ttl, size: settings.packetSize, intervalMs: Int(settings.intervalMs), timeoutMs: Int(settings.timeoutMs)))
             }
             print("PingView::setupPinger \(domainOrIP) \(isPinging)")
             
@@ -157,14 +194,14 @@ struct PingView: View {
         } catch let error as PingError {
             // Handle PingError with a descriptive message
             let errorMessage = error.errorDescription()
-            self.output += "\(errorMessage)\n"
+            outputViewModel.handleEvent(.error(errorMessage))
             print("PingView::setupPinger: PingError:  \(errorMessage)")
             hasError = true
             isPinging = false
         } catch {
             // Handle any other errors
             let unknownErrorMessage = "Unknown error: \(error)"
-            self.output += "\(unknownErrorMessage)\n"
+            outputViewModel.handleEvent(.error(unknownErrorMessage))
             print("PingView::setupPinger: UnknownError:  \(unknownErrorMessage)")
             hasError = true
             isPinging = false
@@ -184,59 +221,16 @@ struct PingView: View {
         }
     }
     
-    func responseToText(_ response: PingResponse) -> String {
-        
-        //64 bytes from mad41s13-in-f3.1e100.net (142.250.200.99): icmp_seq=3 ttl=118 time=3.94 ms
-        let durationMs = String(format: "%.1f", response.duration * 1000)
-        let bytesWithHeader: Int = response.byteCount ?? 0
-        let bytes: String = String(bytesWithHeader)
-        let ttl: String = String(response.ipHeader?.timeToLive ?? 0)
-        let ipAddress: String = response.ipAddress?.description ?? "<ip>"
-        return "\(bytes) bytes from \(ipAddress): icmp_sec: \(String(describing: response.sequenceNumber)) ttl: \(ttl)) time: \(durationMs) ms"
-    }
-    
-    func resultToText(_ pingResult: PingResult) -> String {
-        
-        let transmitted = pingResult.packetsTransmitted
-        let received = pingResult.packetsReceived
-        let packetLossPercentage = 100 * (Double(transmitted) - Double(received)) / Double(transmitted)
-           
-        let packetLoss = String(format: "%.1f", packetLossPercentage)
-           
-        var result = """
-           --- \(domainOrIP) ping statistics ---
-           \(transmitted) packets transmitted, \(received) packets received, \(packetLoss)% packet loss
-           """
-           
-           if let roundtrip = pingResult.roundtrip {
-               let min = String(format: "%.3f", roundtrip.minimum * 1000) // Convert to milliseconds
-               let avg = String(format: "%.3f", roundtrip.average * 1000)
-               let max = String(format: "%.3f", roundtrip.maximum * 1000)
-               let stddev = String(format: "%.3f", roundtrip.standardDeviation * 1000)
-               
-               result += """
-               
-               round-trip min/avg/max/stddev = \(min)/\(avg)/\(max)/\(stddev) ms\n\n
-               """
-           }
-           
-           return result
-    }
-    
     func startPing() {
         isPinging = true
         pinger?.observer = { (response) in
-            print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
-            if let error = response.error {
-                if error == PingError.responseTimeout {
-                    print(error)
-                    self.output.append("Request timeout for icmp_seq: \(String(describing: response.sequenceNumber))\n")
-                } else {
-                    self.output.append("Error: \(error.errorDescription())\n")
-                }
-            } else {
-                self.output.append("\(responseToText(response))\n")
+            // Update results on main thread
+            DispatchQueue.main.async {
+                self.pingResults.append(response)
             }
+            
+            print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
+            self.outputViewModel.handleEvent(.response(response))
         }
         try! pinger?.startPinging()
         
@@ -245,7 +239,7 @@ struct PingView: View {
         isPinging = false
         pinger?.finished = { (result) in
             print("PingView finished with \(result)")
-            self.output += resultToText(result)
+            self.outputViewModel.handleEvent(.statistics(result, domain: self.domainOrIP))
         }
         pinger?.stopPinging()
     }

@@ -20,40 +20,62 @@ struct MainView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                // Input Field
-                TextField("Enter domain or IP", text: $input)
-                    .autocapitalization(.none) // Prevents automatic capitalization
-                    .disableAutocorrection(true) // Disables autocorrection
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding()
-                    .font(.system(size: 28)) //
-                    .frame(height: 88)
+            ZStack {
+                AnimatedGradientBackground()
                 
-                Button(action: addDomainToHistory) {
-                    Text("Ping")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.teal)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal)
-                
-                HistoryListView(
-                    items: historyManager.filteredHistory(for: input),
-                    filter: input,
-                    onSelect: { domain in
-                        historyManager.add(domain)
-                        selectedDomainOrIP = domain
-                        showDetail = true
-                    },
-                    onDelete: { domain in
-                        historyManager.remove(domain)
+                VStack {
+                    // Input Field
+                    GlassmorphicCard {
+                        TextField("Enter domain or IP", text: $input)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .font(.system(size: 28))
+                            .padding()
                     }
-                )
-                
-                Spacer()
+                    .padding(.horizontal)
+                    .padding(.top)
+                    
+                    GlassmorphicCard {
+                        Button(action: addDomainToHistory) {
+                            Text("Ping")
+                                .font(.system(size: 18, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .overlay(
+                        LinearGradient(
+                            colors: [.teal, .cyan],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .mask(
+                            Button(action: addDomainToHistory) {
+                                Text("Ping")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                            }
+                        )
+                    )
+                    .padding(.horizontal)
+                    
+                    HistoryListView(
+                        items: historyManager.filteredHistory(for: input),
+                        filter: input,
+                        onSelect: { domain in
+                            historyManager.add(domain)
+                            selectedDomainOrIP = domain
+                            showDetail = true
+                        },
+                        onDelete: { domain in
+                            historyManager.remove(domain)
+                        }
+                    )
+                    
+                    Spacer()
+                }
             }
             .navigationTitle("Open Ping")
             .toolbar {

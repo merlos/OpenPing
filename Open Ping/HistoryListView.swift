@@ -30,6 +30,8 @@ struct HistoryListView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(.clear)
             .onChange(of: filter) { _, _ in
                 // When typing, attempt to scroll to the first filtered item
                 if let first = items.first {
