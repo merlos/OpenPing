@@ -10,12 +10,12 @@ import SwiftUI
 
 struct PingView: View {
     let domainOrIP: String
-    @State private var output: String = ""
     @State private var isPinging: Bool = true
     @State private var pinger: SwiftyPing?
     @State private var showSettings = false
     @State private var hasError = false
     @State private var pingResults: [PingResponse] = []
+    @StateObject private var outputViewModel = PingOutputViewModel()
     @ObservedObject private var settings = SettingsManager.shared
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -26,15 +26,6 @@ struct PingView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Header
-                Text(domainOrIP)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.top)
-                
-                // Matrix Graph (1/3 height)
                 PingMatrixView(
                     results: pingResults,
                     timeout: settings.timeoutSeconds
@@ -42,22 +33,7 @@ struct PingView: View {
                 .background(Color(UIColor.systemBackground))
                 .border(Color(UIColor.separator), width: 0.5)
                 
-                // Output Text (2/3 height)
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        Text(output)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .font(.system(.caption2, design: .monospaced)) // Monospace font
-                            .id("outputText")
-                    }
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding()
-                    .onChange(of: output) { oldValue, newValue in
-                        proxy.scrollTo("outputText", anchor: .bottom)
-                    }
-                }
+                PingOutputView(viewModel: outputViewModel)
                 
                 // Start/Stop/Retry Button
                 Button(action: togglePing) {
@@ -81,6 +57,7 @@ struct PingView: View {
                 .padding(.bottom, 8)
             }
         }
+        .navigationTitle(domainOrIP)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showSettings = true }) {
@@ -115,11 +92,12 @@ struct PingView: View {
     func setupPinger(resetOutput: Bool, isRetry: Bool = false) async {
         hasError = false
         if resetOutput {
-            self.output = "Resolving \(domainOrIP) IP address...\n"
+            outputViewModel.clear()
+            outputViewModel.handleEvent(.resolving(domain: domainOrIP))
             self.pingResults = []
         } else {
             if isRetry {
-                self.output += "\nResolving \(domainOrIP) IP address...\n"
+                outputViewModel.handleEvent(.resolving(domain: domainOrIP))
                 self.pingResults = []
             }
             // Stop existing pinger if any
@@ -153,22 +131,10 @@ struct PingView: View {
             
             self.pinger = newPinger
             
-            if resetOutput {
-                self.output = ""
-                // Update the UI with the ping initialization message
-                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
-                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
-                } else {
-                    self.output += "PING \(domainOrIP) sent...\n"
-                }
-            } else if isRetry {
-                if let ip = self.pinger?.destination.ip, ip != domainOrIP {
-                    self.output += "PING \(domainOrIP) (\(ip)) sent...\n"
-                } else {
-                    self.output += "PING \(domainOrIP) sent...\n"
-                }
+            if resetOutput || isRetry {
+                outputViewModel.handleEvent(.started(domain: domainOrIP, ip: self.pinger?.destination.ip))
             } else {
-                self.output += "\n--- Configuration updated (TTL: \(settings.ttl), Size: \(settings.packetSize), Interval: \(Int(settings.intervalMs))ms, Timeout: \(Int(settings.timeoutMs))ms) ---\n"
+                outputViewModel.handleEvent(.configUpdate(ttl: settings.ttl, size: settings.packetSize, intervalMs: Int(settings.intervalMs), timeoutMs: Int(settings.timeoutMs)))
             }
             print("PingView::setupPinger \(domainOrIP) \(isPinging)")
             
@@ -179,14 +145,14 @@ struct PingView: View {
         } catch let error as PingError {
             // Handle PingError with a descriptive message
             let errorMessage = error.errorDescription()
-            self.output += "\(errorMessage)\n"
+            outputViewModel.handleEvent(.error(errorMessage))
             print("PingView::setupPinger: PingError:  \(errorMessage)")
             hasError = true
             isPinging = false
         } catch {
             // Handle any other errors
             let unknownErrorMessage = "Unknown error: \(error)"
-            self.output += "\(unknownErrorMessage)\n"
+            outputViewModel.handleEvent(.error(unknownErrorMessage))
             print("PingView::setupPinger: UnknownError:  \(unknownErrorMessage)")
             hasError = true
             isPinging = false
@@ -206,45 +172,6 @@ struct PingView: View {
         }
     }
     
-    func responseToText(_ response: PingResponse) -> String {
-        
-        //64 bytes from mad41s13-in-f3.1e100.net (142.250.200.99): icmp_seq=3 ttl=118 time=3.94 ms
-        let durationMs = String(format: "%.1f", response.duration * 1000)
-        let bytesWithHeader: Int = response.byteCount ?? 0
-        let bytes: String = String(bytesWithHeader)
-        let ttl: String = String(response.ipHeader?.timeToLive ?? 0)
-        let ipAddress: String = response.ipAddress?.description ?? "<ip>"
-        return "\(bytes) bytes from \(ipAddress): icmp_sec: \(String(describing: response.sequenceNumber)) ttl: \(ttl)) time: \(durationMs) ms"
-    }
-    
-    func resultToText(_ pingResult: PingResult) -> String {
-        
-        let transmitted = pingResult.packetsTransmitted
-        let received = pingResult.packetsReceived
-        let packetLossPercentage = 100 * (Double(transmitted) - Double(received)) / Double(transmitted)
-           
-        let packetLoss = String(format: "%.1f", packetLossPercentage)
-           
-        var result = """
-           --- \(domainOrIP) ping statistics ---
-           \(transmitted) packets transmitted, \(received) packets received, \(packetLoss)% packet loss
-           """
-           
-           if let roundtrip = pingResult.roundtrip {
-               let min = String(format: "%.3f", roundtrip.minimum * 1000) // Convert to milliseconds
-               let avg = String(format: "%.3f", roundtrip.average * 1000)
-               let max = String(format: "%.3f", roundtrip.maximum * 1000)
-               let stddev = String(format: "%.3f", roundtrip.standardDeviation * 1000)
-               
-               result += """
-               
-               round-trip min/avg/max/stddev = \(min)/\(avg)/\(max)/\(stddev) ms\n\n
-               """
-           }
-           
-           return result
-    }
-    
     func startPing() {
         isPinging = true
         pinger?.observer = { (response) in
@@ -254,16 +181,7 @@ struct PingView: View {
             }
             
             print("pinger::response response for icmp_sec: \(String(describing: response.sequenceNumber))")
-            if let error = response.error {
-                if error == PingError.responseTimeout {
-                    print(error)
-                    self.output.append("Request timeout for icmp_seq: \(String(describing: response.sequenceNumber))\n")
-                } else {
-                    self.output.append("Error: \(error.errorDescription())\n")
-                }
-            } else {
-                self.output.append("\(responseToText(response))\n")
-            }
+            self.outputViewModel.handleEvent(.response(response))
         }
         try! pinger?.startPinging()
         
@@ -272,7 +190,7 @@ struct PingView: View {
         isPinging = false
         pinger?.finished = { (result) in
             print("PingView finished with \(result)")
-            self.output += resultToText(result)
+            self.outputViewModel.handleEvent(.statistics(result, domain: self.domainOrIP))
         }
         pinger?.stopPinging()
     }
