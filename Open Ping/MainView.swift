@@ -41,24 +41,15 @@ struct MainView: View {
                                 .font(.system(size: 18, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .foregroundColor(.white)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.teal, .cyan],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                         }
                     }
-                    .overlay(
-                        LinearGradient(
-                            colors: [.teal, .cyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .mask(
-                            Button(action: addDomainToHistory) {
-                                Text("Ping")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            }
-                        )
-                    )
                     .padding(.horizontal)
                     
                     HistoryListView(
