@@ -17,6 +17,7 @@ struct PingView: View {
     @State private var pingResults: [PingResponse] = []
     @StateObject private var outputViewModel = PingOutputViewModel()
     @ObservedObject private var settings = SettingsManager.shared
+    @ObservedObject private var historyManager = HistoryManager.shared
     @State private var isMatrixExpanded = false
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -129,8 +130,14 @@ struct PingView: View {
         .navigationTitle(domainOrIP)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "gearshape")
+                HStack(spacing: 16) {
+                    Button(action: { historyManager.togglePin(domainOrIP) }) {
+                        Image(systemName: historyManager.isPinned(domainOrIP) ? "pin.fill" : "pin")
+                            .foregroundColor(historyManager.isPinned(domainOrIP) ? .orange : .primary)
+                    }
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape")
+                    }
                 }
             }
         }

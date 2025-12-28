@@ -8,14 +8,23 @@
 import SwiftUI
 
 class HistoryManager: ObservableObject {
-    @Published var history: [String] = []
-    private let storageKey = "PingHistory"
+    static let shared = HistoryManager()
     
-    init(history: [String]? = nil) {
+    @Published var history: [String] = []
+    @Published var pinnedItems: [String] = []
+    private let storageKey = "PingHistory"
+    private let pinnedStorageKey = "PinnedItems"
+    
+    init(history: [String]? = nil, pinned: [String]? = nil) {
         if let history = history {
             self.history = history
         } else {
             load()
+        }
+        if let pinned = pinned {
+            self.pinnedItems = pinned
+        } else {
+            loadPinned()
         }
     }
     
@@ -25,8 +34,18 @@ class HistoryManager: ObservableObject {
         }
     }
     
+    private func loadPinned() {
+        if let savedPinned = UserDefaults.standard.array(forKey: pinnedStorageKey) as? [String] {
+            pinnedItems = savedPinned
+        }
+    }
+    
     private func save() {
         UserDefaults.standard.set(history, forKey: storageKey)
+    }
+    
+    private func savePinned() {
+        UserDefaults.standard.set(pinnedItems, forKey: pinnedStorageKey)
     }
     
     func add(_ domain: String) {
@@ -47,12 +66,48 @@ class HistoryManager: ObservableObject {
             history.remove(at: index)
             save()
         }
+        // Also remove from pinned if it was pinned
+        unpin(domain)
+    }
+    
+    func isPinned(_ domain: String) -> Bool {
+        pinnedItems.contains(domain)
+    }
+    
+    func togglePin(_ domain: String) {
+        if isPinned(domain) {
+            unpin(domain)
+        } else {
+            pin(domain)
+        }
+    }
+    
+    func pin(_ domain: String) {
+        guard !isPinned(domain) else { return }
+        // Insert at the beginning so last pinned is first
+        pinnedItems.insert(domain, at: 0)
+        savePinned()
+    }
+    
+    func unpin(_ domain: String) {
+        if let index = pinnedItems.firstIndex(of: domain) {
+            pinnedItems.remove(at: index)
+            savePinned()
+        }
     }
     
     func filteredHistory(for query: String) -> [String] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return history }
-        let matches = history.filter { $0.range(of: trimmedQuery, options: .caseInsensitive) != nil }
-        return matches.isEmpty ? history : matches
+        
+        // If searching, just return filtered results without pinned order
+        guard trimmedQuery.isEmpty else {
+            let matches = history.filter { $0.range(of: trimmedQuery, options: .caseInsensitive) != nil }
+            return matches.isEmpty ? history : matches
+        }
+        
+        // No search: show pinned items first, then unpinned
+        let pinned = pinnedItems.filter { history.contains($0) }
+        let unpinned = history.filter { !pinnedItems.contains($0) }
+        return pinned + unpinned
     }
 }
