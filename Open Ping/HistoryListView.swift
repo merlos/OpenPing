@@ -10,17 +10,39 @@ import SwiftUI
 struct HistoryListView: View {
     var items: [String]
     var filter: String
+    var pinnedItems: Set<String>
     var onSelect: (String) -> Void
     var onDelete: (String) -> Void
+    var onTogglePin: (String) -> Void
+    
+    init(items: [String], filter: String, pinnedItems: [String] = [], onSelect: @escaping (String) -> Void, onDelete: @escaping (String) -> Void, onTogglePin: @escaping (String) -> Void = { _ in }) {
+        self.items = items
+        self.filter = filter
+        self.pinnedItems = Set(pinnedItems)
+        self.onSelect = onSelect
+        self.onDelete = onDelete
+        self.onTogglePin = onTogglePin
+    }
     
     var body: some View {
         ScrollViewReader { proxy in
             List {
                 ForEach(items, id: \.self) { domain in
-                    Button(action: {
-                        onSelect(domain)
-                    }) {
+                    HStack {
                         Text(domain)
+                        Spacer()
+                        if pinnedItems.contains(domain) {
+                            Image(systemName: "pin.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .contentShape(Rectangle()) // Make entire row tappable
+                    .onTapGesture {
+                        onSelect(domain)
+                    }
+                    .onLongPressGesture {
+                        onTogglePin(domain)
                     }
                     .id(domain) // stable ID for scrolling
                 }
@@ -48,7 +70,9 @@ struct HistoryListView: View {
     HistoryListView(
         items: ["google.com", "apple.com", "example.com"],
         filter: "",
+        pinnedItems: ["google.com"],
         onSelect: { _ in },
-        onDelete: { _ in }
+        onDelete: { _ in },
+        onTogglePin: { _ in }
     )
 }

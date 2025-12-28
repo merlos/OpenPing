@@ -9,14 +9,10 @@ import SwiftUI
 
 struct MainView: View {
     @State private var input: String = ""
-    @StateObject private var historyManager: HistoryManager
+    @ObservedObject private var historyManager = HistoryManager.shared
     @State private var showDetail = false
     @State private var showSettings = false
     @State private var selectedDomainOrIP: String?
-    
-    init(historyManager: HistoryManager = HistoryManager()) {
-        _historyManager = StateObject(wrappedValue: historyManager)
-    }
 
     var body: some View {
         NavigationStack {
@@ -27,6 +23,8 @@ struct MainView: View {
                     // Input Field
                     GlassmorphicCard {
                         TextField("Enter domain or IP", text: $input)
+                            .keyboardType(.URL)
+                            .textContentType(.URL)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .font(.system(size: 28))
@@ -41,29 +39,21 @@ struct MainView: View {
                                 .font(.system(size: 18, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .foregroundColor(.white)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.teal, .cyan],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                         }
                     }
-                    .overlay(
-                        LinearGradient(
-                            colors: [.teal, .cyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .mask(
-                            Button(action: addDomainToHistory) {
-                                Text("Ping")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            }
-                        )
-                    )
                     .padding(.horizontal)
                     
                     HistoryListView(
                         items: historyManager.filteredHistory(for: input),
                         filter: input,
+                        pinnedItems: historyManager.pinnedItems,
                         onSelect: { domain in
                             historyManager.add(domain)
                             selectedDomainOrIP = domain
@@ -71,6 +61,9 @@ struct MainView: View {
                         },
                         onDelete: { domain in
                             historyManager.remove(domain)
+                        },
+                        onTogglePin: { domain in
+                            historyManager.togglePin(domain)
                         }
                     )
                     
@@ -119,6 +112,6 @@ struct MainView: View {
 }
 
 #Preview {
-    MainView(historyManager: HistoryManager(history: ["google.com", "apple.com", "example.com"]))
+    MainView()
         //.environment(\.colorScheme, .dark) // Preview in Dark Mode
 }

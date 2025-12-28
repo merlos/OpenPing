@@ -17,6 +17,7 @@ struct PingView: View {
     @State private var pingResults: [PingResponse] = []
     @StateObject private var outputViewModel = PingOutputViewModel()
     @ObservedObject private var settings = SettingsManager.shared
+    @ObservedObject private var historyManager = HistoryManager.shared
     @State private var isMatrixExpanded = false
 
     init(domainOrIP: String, isPinging: Bool=true) {
@@ -30,40 +31,60 @@ struct PingView: View {
             
             GeometryReader { geometry in
                 let buttonHeight: CGFloat = 66
-                let matrixTopPadding: CGFloat = 8
-                let outputTopPadding: CGFloat = 8
-                let totalPadding = matrixTopPadding + outputTopPadding + buttonHeight
+                let topPadding: CGFloat = 8
+                let totalPadding = topPadding + buttonHeight
                 let availableHeight = geometry.size.height - totalPadding
                 
+                // Heights for components
+                let statsHeight: CGFloat = 110
+                let graphHeight: CGFloat = 150
                 let matrixCollapsedHeight: CGFloat = 120
-                let outputExpandedHeight = availableHeight - matrixCollapsedHeight
-                // we reverse heights when expanded
-                let matrixExpandedHeight = outputExpandedHeight
-                let outputCollapsedHeight: CGFloat = matrixCollapsedHeight
+                let spacing: CGFloat = 8 * 4 // 4 gaps between components
                 
+                // Calculate text height based on remaining space
+                let fixedComponentsHeight = statsHeight + graphHeight + matrixCollapsedHeight + spacing
+                let textExpandedHeight = max(100, availableHeight - fixedComponentsHeight)
+                let textCollapsedHeight: CGFloat = 60
+                
+                // When matrix expanded, it takes text's space
+                let matrixExpandedHeight = matrixCollapsedHeight + textExpandedHeight - textCollapsedHeight
                 
                 VStack(spacing: 0) {
-                    PingMatrixView(
-                        results: pingResults,
-                        timeout: settings.timeoutSeconds,
-                        availableHeight: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight
-                    )
-                    .frame(height: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight)
-                    .background(Color(UIColor.systemBackground).opacity(0.3))
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 8)
-                    .padding(.top, matrixTopPadding)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                            isMatrixExpanded.toggle()
+                    // Scrollable content area
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            // 1. Stats Section
+                            PingStatsView(results: pingResults, timeout: settings.timeoutSeconds)
+                                .frame(height: statsHeight)
+                            
+                            // 2. Graph Section
+                            PingGraphView(results: pingResults, timeout: settings.timeoutSeconds)
+                                .frame(height: graphHeight)
+                            
+                            // 3. Matrix View
+                            PingMatrixView(
+                                results: pingResults,
+                                timeout: settings.timeoutSeconds,
+                                availableHeight: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight
+                            )
+                            .frame(height: isMatrixExpanded ? matrixExpandedHeight : matrixCollapsedHeight)
+                            .background(Color(UIColor.systemBackground).opacity(0.3))
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                    isMatrixExpanded.toggle()
+                                }
+                            }
+                            
+                            // 4. Output Log Section
+                            PingOutputView(viewModel: outputViewModel)
+                                .frame(height: isMatrixExpanded ? textCollapsedHeight : textExpandedHeight)
                         }
-                    }
-                    
-                    PingOutputView(viewModel: outputViewModel)
-                        .frame(height: isMatrixExpanded ? outputCollapsedHeight : outputExpandedHeight)
                         .padding(.horizontal, 8)
-                        .padding(.top, outputTopPadding)
+                    }
+                    .frame(height: availableHeight)
+                    .padding(.top, topPadding)
                     
                     // Start/Stop/Retry Button
                     Button(action: togglePing) {
@@ -109,8 +130,14 @@ struct PingView: View {
         .navigationTitle(domainOrIP)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "gearshape")
+                HStack(spacing: 16) {
+                    Button(action: { historyManager.togglePin(domainOrIP) }) {
+                        Image(systemName: historyManager.isPinned(domainOrIP) ? "pin.fill" : "pin")
+                            .foregroundColor(historyManager.isPinned(domainOrIP) ? .orange : .primary)
+                    }
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape")
+                    }
                 }
             }
         }
