@@ -63,7 +63,9 @@ struct MainView: View {
                             historyManager.remove(domain)
                         },
                         onTogglePin: { domain in
+                            let wasPinned = historyManager.isPinned(domain)
                             historyManager.togglePin(domain)
+                            ToastManager.shared.show(wasPinned ? "Unpinned" : "Pinned")
                         }
                     )
                     
@@ -91,6 +93,7 @@ struct MainView: View {
                 }
             }
         }
+        .withToast()
     }
     
     func addDomainToHistory() {

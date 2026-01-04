@@ -7,6 +7,170 @@
 
 import SwiftUI
 
+// Validated numeric text field that validates on blur
+struct ValidatedNumberField: View {
+    let placeholder: String
+    @Binding var value: Int
+    let min: Int
+    let max: Int
+    let toastDuration: TimeInterval
+    
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+    
+    init(_ placeholder: String, value: Binding<Int>, min: Int, max: Int, toastDuration: TimeInterval = 2.0) {
+        self.placeholder = placeholder
+        self._value = value
+        self.min = min
+        self.max = max
+        self.toastDuration = toastDuration
+        self._textValue = State(initialValue: String(value.wrappedValue))
+    }
+    
+    var body: some View {
+        TextField(placeholder, text: $textValue)
+            .keyboardType(.numberPad)
+            .frame(width: 70)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .focused($isFocused)
+            .onChange(of: textValue) { _, newValue in
+                // Only allow digits
+                let filtered = newValue.filter { $0.isNumber }
+                if filtered != newValue {
+                    textValue = filtered
+                }
+                // Limit to 6 digits (0-999999)
+                if filtered.count > 6 {
+                    textValue = String(filtered.prefix(6))
+                }
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused {
+                    validateAndClamp()
+                }
+            }
+            .onChange(of: value) { _, newValue in
+                // Sync text when value changes externally (e.g., slider or reset)
+                if !isFocused {
+                    textValue = String(newValue)
+                }
+            }
+            .onAppear {
+                textValue = String(value)
+            }
+    }
+    
+    private func validateAndClamp() {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        
+        guard let numValue = Int(textValue), !textValue.isEmpty else {
+            // Empty or invalid - reset to current value
+            textValue = String(value)
+            return
+        }
+        
+        if numValue < min {
+            let formattedInput = formatter.string(from: NSNumber(value: numValue)) ?? "\(numValue)"
+            let formattedMin = formatter.string(from: NSNumber(value: min)) ?? "\(min)"
+            ToastManager.shared.show("\(formattedInput) is smaller than the minimum \(formattedMin).", duration: toastDuration)
+            value = min
+            textValue = String(min)
+        } else if numValue > max {
+            let formattedInput = formatter.string(from: NSNumber(value: numValue)) ?? "\(numValue)"
+            let formattedMax = formatter.string(from: NSNumber(value: max)) ?? "\(max)"
+            ToastManager.shared.show("\(formattedInput) is larger than the maximum \(formattedMax).", duration: toastDuration)
+            value = max
+            textValue = String(max)
+        } else {
+            value = numValue
+            textValue = String(numValue)
+        }
+    }
+}
+
+// Double version for timeout/interval
+struct ValidatedDoubleField: View {
+    let placeholder: String
+    @Binding var value: Double
+    let min: Double
+    let max: Double
+    let toastDuration: TimeInterval
+    
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+    
+    init(_ placeholder: String, value: Binding<Double>, min: Double, max: Double, toastDuration: TimeInterval = 2.0) {
+        self.placeholder = placeholder
+        self._value = value
+        self.min = min
+        self.max = max
+        self.toastDuration = toastDuration
+        self._textValue = State(initialValue: String(Int(value.wrappedValue)))
+    }
+    
+    var body: some View {
+        TextField(placeholder, text: $textValue)
+            .keyboardType(.numberPad)
+            .frame(width: 70)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .focused($isFocused)
+            .onChange(of: textValue) { _, newValue in
+                // Only allow digits
+                let filtered = newValue.filter { $0.isNumber }
+                if filtered != newValue {
+                    textValue = filtered
+                }
+                // Limit to 6 digits (0-999999)
+                if filtered.count > 6 {
+                    textValue = String(filtered.prefix(6))
+                }
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused {
+                    validateAndClamp()
+                }
+            }
+            .onChange(of: value) { _, newValue in
+                // Sync text when value changes externally (e.g., slider or reset)
+                if !isFocused {
+                    textValue = String(Int(newValue))
+                }
+            }
+            .onAppear {
+                textValue = String(Int(value))
+            }
+    }
+    
+    private func validateAndClamp() {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        
+        guard let numValue = Double(textValue), !textValue.isEmpty else {
+            // Empty or invalid - reset to current value
+            textValue = String(Int(value))
+            return
+        }
+        
+        if numValue < min {
+            let formattedInput = formatter.string(from: NSNumber(value: Int(numValue))) ?? "\(Int(numValue))"
+            let formattedMin = formatter.string(from: NSNumber(value: Int(min))) ?? "\(Int(min))"
+            ToastManager.shared.show("\(formattedInput) is smaller than the minimum \(formattedMin).", duration: toastDuration)
+            value = min
+            textValue = String(Int(min))
+        } else if numValue > max {
+            let formattedInput = formatter.string(from: NSNumber(value: Int(numValue))) ?? "\(Int(numValue))"
+            let formattedMax = formatter.string(from: NSNumber(value: Int(max))) ?? "\(Int(max))"
+            ToastManager.shared.show("\(formattedInput) is larger than the maximum \(formattedMax).", duration: toastDuration)
+            value = max
+            textValue = String(Int(max))
+        } else {
+            value = numValue
+            textValue = String(Int(numValue))
+        }
+    }
+}
+
 struct SettingsView: View {
     @StateObject private var settings = SettingsManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -27,14 +191,7 @@ struct SettingsView: View {
                                 set: { settings.ttl = Int($0) }
                             ), in: Double(settings.minTTL)...Double(settings.maxTTL), step: 1)
                             
-                            TextField("TTL", value: $settings.ttl, formatter: NumberFormatter())
-                                .keyboardType(.numberPad)
-                                .frame(width: 60)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: settings.ttl) { _, newValue in
-                                    if newValue < settings.minTTL { settings.ttl = settings.minTTL }
-                                    if newValue > settings.maxTTL { settings.ttl = settings.maxTTL }
-                                }
+                            ValidatedNumberField("TTL", value: $settings.ttl, min: settings.minTTL, max: settings.maxTTL)
                         }
                     }
                     
@@ -47,14 +204,7 @@ struct SettingsView: View {
                         HStack {
                             Slider(value: $settings.timeoutMs, in: settings.minTimeout...settings.maxTimeout, step: 100)
                             
-                            TextField("ms", value: $settings.timeoutMs, formatter: NumberFormatter())
-                                .keyboardType(.numberPad)
-                                .frame(width: 60)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: settings.timeoutMs) { _, newValue in
-                                    if newValue < settings.minTimeout { settings.timeoutMs = settings.minTimeout }
-                                    if newValue > settings.maxTimeout { settings.timeoutMs = settings.maxTimeout }
-                                }
+                            ValidatedDoubleField("ms", value: $settings.timeoutMs, min: settings.minTimeout, max: settings.maxTimeout)
                         }
                     }
                     
@@ -67,14 +217,7 @@ struct SettingsView: View {
                         HStack {
                             Slider(value: $settings.intervalMs, in: settings.minInterval...settings.maxInterval, step: 100)
                             
-                            TextField("ms", value: $settings.intervalMs, formatter: NumberFormatter())
-                                .keyboardType(.numberPad)
-                                .frame(width: 60)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: settings.intervalMs) { _, newValue in
-                                    if newValue < settings.minInterval { settings.intervalMs = settings.minInterval }
-                                    if newValue > settings.maxInterval { settings.intervalMs = settings.maxInterval }
-                                }
+                            ValidatedDoubleField("ms", value: $settings.intervalMs, min: settings.minInterval, max: settings.maxInterval)
                         }
                     }
                     
@@ -90,14 +233,7 @@ struct SettingsView: View {
                                 set: { settings.packetSize = Int($0) }
                             ), in: Double(settings.minPacketSize)...1500, step: 1) // Slider capped at 1500 for usability, but text can go higher
                             
-                            TextField("bytes", value: $settings.packetSize, formatter: NumberFormatter())
-                                .keyboardType(.numberPad)
-                                .frame(width: 60)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: settings.packetSize) { _, newValue in
-                                    if newValue < settings.minPacketSize { settings.packetSize = settings.minPacketSize }
-                                    if newValue > settings.maxPacketSize { settings.packetSize = settings.maxPacketSize }
-                                }
+                            ValidatedNumberField("bytes", value: $settings.packetSize, min: settings.minPacketSize, max: settings.maxPacketSize)
                         }
                     }
                 }
@@ -119,8 +255,15 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
             }
         }
+        .withToast()
     }
 }
 
