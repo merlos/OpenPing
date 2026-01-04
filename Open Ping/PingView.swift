@@ -19,6 +19,7 @@ struct PingView: View {
     @ObservedObject private var settings = SettingsManager.shared
     @ObservedObject private var historyManager = HistoryManager.shared
     @State private var isMatrixExpanded = false
+    @State private var hasAppeared = false  // Track first appearance
 
     init(domainOrIP: String, isPinging: Bool=true) {
         self.domainOrIP = domainOrIP
@@ -152,8 +153,12 @@ struct PingView: View {
             }
         }
         .onAppear {
-            Task {
-                await setupPinger(resetOutput: true)
+            // Only setup pinger on first appearance, not when returning from background
+            if !hasAppeared {
+                hasAppeared = true
+                Task {
+                    await setupPinger(resetOutput: true)
+                }
             }
         }
 
