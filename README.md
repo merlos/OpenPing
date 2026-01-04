@@ -11,7 +11,9 @@ Simple application that allows you to ping a domain or an IP (IPv4). Main use ca
 
 ## Install / Download
 
-The app is not yet published on the App Store
+**[Available on the App Store](https://apps.apple.com/us/app/open-ping-network-icmp-tool/id6740431290)**
+
+
 
 
 ## why did you create Open Ping?
