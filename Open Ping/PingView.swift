@@ -132,7 +132,11 @@ struct PingView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 16) {
-                    Button(action: { historyManager.togglePin(domainOrIP) }) {
+                    Button(action: {
+                        let wasPinned = historyManager.isPinned(domainOrIP)
+                        historyManager.togglePin(domainOrIP)
+                        ToastManager.shared.show(wasPinned ? "Unpinned" : "Pinned")
+                    }) {
                         Image(systemName: historyManager.isPinned(domainOrIP) ? "pin.fill" : "pin")
                             .foregroundColor(historyManager.isPinned(domainOrIP) ? .orange : .primary)
                     }
